@@ -57,13 +57,14 @@ hb_input_destroy(gpointer user_data)
 	g_main_quit(mainloop);
 	return;
 }
-
+/* 1秒周期で実行されるタイマー処理 */
 static gboolean
 hb_timeout_dispatch(gpointer user_data)
 {	
 	if(debug_level > 0) {
 		ccm_check_memoryleak();
 	}
+	/* 受信処理にccmデータを渡す */
 	return hb_input_dispatch(0, user_data);
 }
 
@@ -286,6 +287,7 @@ main(int argc, char **argv)
 	G_main_add_IPC_Channel(G_PRIORITY_HIGH, ccm_get_ipcchan(ccm), 
 			FALSE, hb_input_dispatch, ccm, hb_input_destroy);
 	//Heartbeatメッセージタイムアウトセット */
+	//1秒周期でccmデータを受信処理に送っている
 	Gmain_timeout_add_full(G_PRIORITY_HIGH, SECOND, hb_timeout_dispatch,
 				ccm, hb_input_destroy);
 

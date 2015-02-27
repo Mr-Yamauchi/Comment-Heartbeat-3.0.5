@@ -276,7 +276,7 @@ ccm_send_extra_nodemsg(ll_cluster_t* hb, ccm_info_t* info, int type,
 	return(rc);
 
 }
-
+/* CCM_TYPE_PROTOVERSIONメッセージ送信処理 */
 int
 ccm_send_protoversion(ll_cluster_t *hb, ccm_info_t *info)
 {
@@ -289,13 +289,13 @@ ccm_send_join(ll_cluster_t *hb, ccm_info_t *info)
 {
 	return ccm_send_standard_clustermsg(hb, info, CCM_TYPE_JOIN);
 }
-
+/* CCM_TYPE_REQ_MEMLISTメッセージ送信処理 */
 int
 ccm_send_memlist_request(ll_cluster_t *hb, ccm_info_t *info)
 {
 	return ccm_send_standard_clustermsg(hb, info, CCM_TYPE_REQ_MEMLIST);
 }
-
+/* CCM_TYPE_RES_MEMLISTメッセージ送信処理 */
 int
 ccm_send_memlist_res(ll_cluster_t *hb, 
 		     ccm_info_t *info,
@@ -326,7 +326,7 @@ ccm_send_memlist_res(ll_cluster_t *hb,
 	return(rc);
 }
 
-
+/* CCM_TYPE_FINAL_MEMLISTメッセージ送信処理 */
 int
 ccm_send_final_memlist(ll_cluster_t *hb, 
 			ccm_info_t *info, 
@@ -475,7 +475,7 @@ timeout_msg_init(ccm_info_t *info)
 
 
 static struct ha_msg * timeout_msg = NULL;
-
+/* CCM_TYPE_TIMEOUTメッセージを生成する */
 struct ha_msg  *
 timeout_msg_mod(ccm_info_t *info)
 {

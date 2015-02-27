@@ -98,6 +98,7 @@ nodelist_update(ll_cluster_t* hb, ccm_info_t* info,
 	if (STRNCMP_CONST(status, DEADSTATUS) == 0){
 		
 		if(node_is_member(info, id)){
+			/* インデックスをleave情報にキャッシュする */
 			leave_cache(llm_get_index(llm, id));
 		}
 		
@@ -232,7 +233,8 @@ ccm_control_process(ccm_info_t *info, ll_cluster_t * hb)
 		}
 
 	} else {
-		/* メッセージが受信出来ない場合 */
+		/* メッセージが受信出来ない場合、CCM_TYPE_TIMEOUTメッセージを生成する */
+		/* １秒周期のタイマーからの呼び出しの場合 */
 		msg = timeout_msg_mod(info);
 	}
 
@@ -268,10 +270,10 @@ ccm_control_process(ccm_info_t *info, ll_cluster_t * hb)
 	state_msg_handler_t	state_msg_handler[]={
 	ccm_state_none,
 	ccm_state_version_request,
-	ccm_state_joining,  						/* CCM_STATE_JOINING状態でのメッセージ受信処理 */
-	ccm_state_sent_memlistreq,
-	ccm_state_memlist_res,
-	ccm_state_joined, 
+	ccm_state_joining,  						//CCM_STATE_JOINING状態でのメッセージ受信処理
+	ccm_state_sent_memlistreq,					//CCM_STATE_SENT_MEMLISTREQ状態でのメッセージ受信処理
+	ccm_state_memlist_res,						//CCM_STATE_MEMLIST_RES状態でのメッセージ受信処理
+	ccm_state_joined, 							//
 	ccm_state_wait_for_mem_list,
 	ccm_state_wait_for_change,
 	ccm_state_new_node_wait_for_mem_list,

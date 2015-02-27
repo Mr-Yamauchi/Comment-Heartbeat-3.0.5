@@ -327,6 +327,7 @@ ccm_reset(ccm_info_t *info)
 	ccm_memcomp_reset(info);
 	CCM_SET_ACTIVEPROTO(info, CCM_VER_NONE);
 	CCM_SET_COOKIE(info,"");
+	/* info->ccm_transition_majorを0にセットして、info->ccm_max_transitionもセットする */
 	CCM_SET_MAJORTRANS(info,0);
 	CCM_SET_MINORTRANS(info,0);
 	CCM_SET_CL(info,-1);
@@ -349,8 +350,9 @@ ccm_init(ccm_info_t *info)
 	/* JOINREQUEST情報のリセット(ノードステータス情報のJOINREQUESTフラグをFALSE,MARJOR_TRANSを０クリアする) */
 	ccm_reset_all_join_request(info);
 	CCM_INIT_MAXTRANS(info);
-        leave_init();
-        (void)timeout_msg_init(info);
+	/* leave情報の初期化 */
+    leave_init();
+    (void)timeout_msg_init(info);
 	/* CCM情報(global_info)のリセット */
 	ccm_reset(info);
 }
@@ -369,6 +371,7 @@ report_reset(void)
 /* */
 /* print and report the cluster membership to clients. */
 /* */
+/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 static void
 report_mbrs(ccm_info_t *info)
 {
@@ -410,6 +413,7 @@ report_mbrs(ccm_info_t *info)
 	 * report to clients, the new membership 
 	 */
 	dump_mbrs(info);
+	/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 	client_new_mbrship(info,
 			   bornon);
 	return;
@@ -840,7 +844,7 @@ ccm_compute_and_send_final_memlist(ll_cluster_t *hb, ccm_info_t *info)
 	repeat = 0;
 	ccm_mem_bitmapfill(info, bitmap);
 	bitmap_delete(bitmap);
-	
+	/* CCM_TYPE_FINAL_MEMLISTメッセージ送信処理 */
 	while (ccm_send_final_memlist(hb, info, cookie, string, maxtrans+1) 
 					!= HA_OK) {
 		if(repeat < REPEAT_TIMES){
@@ -876,6 +880,7 @@ ccm_compute_and_send_final_memlist(ll_cluster_t *hb, ccm_info_t *info)
 	ccm_send_join_reply(hb, info);
 
 	CCM_SET_CL(info, llm_get_myindex(CCM_GET_LLM(info)));
+	/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 	report_mbrs(info);/* call this before update_reset() */
 /*	update_reset(CCM_GET_UPDATETABLE(info));*/
 	ccm_memcomp_reset(info);
@@ -944,6 +949,7 @@ ccm_send_cl_reply(ll_cluster_t *hb, ccm_info_t *info)
 			 * in the past 
 			 */
 			repeat = 0;
+			/* CCM_TYPE_RES_MEMLISTメッセージを送信する */
 			while (ccm_send_memlist_res(hb, info, cl, memlist)
 						!=HA_OK) {
 				if(repeat < REPEAT_TIMES){
@@ -959,6 +965,7 @@ ccm_send_cl_reply(ll_cluster_t *hb, ccm_info_t *info)
 			/* I dont trust this Cluster Leader.
 			Send NULL memlist message */
 			repeat = 0;
+			/* CCM_TYPE_RES_MEMLISTメッセージを送信する */
 			while (ccm_send_memlist_res(hb, info, cl_tmp, NULL)
 					!= HA_OK) {
 				if(repeat < REPEAT_TIMES){
@@ -1000,7 +1007,7 @@ ccm_readmsg(ccm_info_t *info, ll_cluster_t *hb)
 		/* create a leave message and return it */
 		return ccm_create_leave_msg(info, uuid);
 	}
-	
+	/* メッセージを読み込む */
 	return hb->llc_ops->readmsg(hb, 0);
 }
 
@@ -1059,6 +1066,7 @@ ccm_joining_to_joined(ll_cluster_t *hb, ccm_info_t *info)
 	update_reset(CCM_GET_UPDATETABLE(info));
 	/* infoのstateをCCM_STATE_JOINEDにセット */
 	ccm_set_state(info, CCM_STATE_JOINED, NULL);
+	/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 	report_mbrs(info);
 	if(!ccm_already_joined(info)) {
 		CCM_SET_JOINED_TRANSITION(info, 1);
@@ -1073,7 +1081,7 @@ ccm_joining_to_joined(ll_cluster_t *hb, ccm_info_t *info)
  * NOTE: this is generally called when a node when it  determines 
  * that it is all alone in the cluster. 
  */
-
+/* CCM_STATE_JOINED状態へ遷移する */
 static int
 ccm_init_to_joined(ccm_info_t *info)
 {
@@ -1101,6 +1109,7 @@ ccm_init_to_joined(ccm_info_t *info)
 	/* infoのstateをCCM_STATE_JOINEDにセット */
 	ccm_set_state(info, CCM_STATE_JOINED, NULL);
 	CCM_SET_JOINED_TRANSITION(info, 1);
+	/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 	report_mbrs(info);
 	return HA_OK;
 }
@@ -1310,6 +1319,7 @@ ccm_state_version_request(enum ccm_type ccm_msg_type,
 			break;
 		case VER_TRY_END:
 			if(ccm_am_i_highest_joiner(info)) {
+				/* CCM_STATE_JOINED状態へ遷移する */
 				ccm_init_to_joined(info);
 				ccm_send_join_reply(hb, info);
 				
@@ -1335,6 +1345,7 @@ ccm_state_version_request(enum ccm_type ccm_msg_type,
 		ccm_add_new_joiner(info, orig, reply);
 		if (ccm_get_all_active_join_request(info)
 		    && ccm_am_i_highest_joiner(info)){
+			/* CCM_STATE_JOINED状態へ遷移する */
 			ccm_init_to_joined(info);
 			ccm_send_join_reply(hb, info);
 		}
@@ -1566,6 +1577,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 					CCM_RESET_MINORTRANS(info);
 					CCM_SET_COOKIE(info, newcookie); 
 					ccm_free_random_cookie(newcookie);
+					/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 					report_mbrs(info);
 					return;
 				}
@@ -1654,6 +1666,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 					CCM_RESET_MINORTRANS(info);
 					CCM_SET_COOKIE(info, newcookie);
 					ccm_free_random_cookie(newcookie);
+					/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 					report_mbrs(info);
 					return;
 				}
@@ -1729,6 +1742,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 				ccm_set_state(info, CCM_STATE_NONE, reply);
 				break;
 			}
+			/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 			report_mbrs(info);
 
 			break;
@@ -1878,6 +1892,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 					CCM_SET_MAJORTRANS(info, trans_majorval+1); 
 					CCM_RESET_MINORTRANS(info);
 					CCM_SET_COOKIE(info, newcookie); 
+					/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 					report_mbrs(info);
 					/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 					reset_change_info(info); 
@@ -1949,6 +1964,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 					CCM_SET_MAJORTRANS(info, trans_majorval+1); 
 					CCM_RESET_MINORTRANS(info);
 					CCM_SET_COOKIE(info, newcookie); 
+					/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 					report_mbrs(info);
 					/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 					reset_change_info(info); 
@@ -2059,7 +2075,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 /* */
 /* The state machine that processes message when it is */
 /*	in the CCM_STATE_SENT_MEMLISTREQ state */
-/* */
+/* CCM_STATE_SENT_MEMLISTREQ状態でのメッセージ受信処理 */
 static void
 ccm_state_sent_memlistreq(enum ccm_type ccm_msg_type, 
 			struct ha_msg *reply, 
@@ -2186,10 +2202,14 @@ switchstatement:
 			/* if this is my own message just forget it */
   			if(strncmp(orig, llm_get_mynodename(&info->llm),
   				   NODEIDSIZE) == 0){
+				/* 自ノードからのCCM_TYPE_REQ_MEMLISTメッセージの場合 */
 				if(llm_get_live_nodecount(&info->llm) == 1){
+					/* 自ノードしかいない場合 */
 					ccm_log(LOG_INFO, "%s: directly call"
 						"ccm_compute_and_send_final_memlist()",
 						__FUNCTION__);
+					/* CCM_TYPE_FINAL_MEMLISTメッセージを送信する */
+					/* infoのstateをCCM_STATE_JOINEDにセット */
 					ccm_compute_and_send_final_memlist(hb, info);
 				}
   				break;
@@ -2299,7 +2319,7 @@ switchstatement:
 /* */
 /* the state machine that processes messages when it is in the */
 /* CCM_STATE_MEMLIST_RES state. */
-/* */
+/* CCM_STATE_MEMLIST_RES状態でのメッセージ受信処理*/
 static void
 ccm_state_memlist_res(enum ccm_type ccm_msg_type, 
 		struct ha_msg *reply, 
@@ -2485,7 +2505,7 @@ switchstatement:
 
 			break;
 
-        	case CCM_TYPE_TIMEOUT:
+   		case CCM_TYPE_TIMEOUT:
 			/* If we have waited too long for the leader to respond
 			 * just assume that the leader is dead and start over
 			 * a new round of the protocol
@@ -2626,6 +2646,7 @@ switchstatement:
 			indx = llm_get_index(&info->llm, cl); 
 			assert(indx != -1);
 			CCM_SET_CL(info, indx); 
+			/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 			report_mbrs(info); /* call before update_reset */
 /*			update_reset(CCM_GET_UPDATETABLE(info));*/
 			finallist_reset();
@@ -2729,9 +2750,10 @@ ccm_state_joining(enum ccm_type ccm_msg_type,
 		ccm_debug(LOG_WARNING, "%s: no transition minor information", __FUNCTION__);
 		return;
 	}
-
+	/* 受信メッセージのCCM_MINORTRANSを数値化する */
 	trans_minorval = atoi(trans);
 	if (trans_minorval < CCM_GET_MINORTRANS(info)) {
+		/* 自ノードのccm_transition_minorよりも小さいメッセージは無視する */
 		return;
 	}
 
@@ -2789,13 +2811,16 @@ switchstatement:
 			 * and send a fresh JOIN message 
 			 */
 			if (trans_minorval > CCM_GET_MINORTRANS(info)) {
+				/* 受信したCCM_MINORTRANSが自ノードのccm_transition_minorよりも大きい場合 */
+				/* ※たぶん、他のクラスタ構成がいる場合 */
 				update_reset(CCM_GET_UPDATETABLE(info));
 				update_add( CCM_GET_UPDATETABLE(info),
 					CCM_GET_LLM(info), orig, uptime_val, TRUE);
 
 				CCM_SET_MINORTRANS(info, trans_minorval);
 				repeat = 0;
-				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */
+				/* ※たぶん、他のクラスタ構成への参加の為 */
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_log(LOG_ERR, 
@@ -2826,6 +2851,7 @@ switchstatement:
 						/* send out the 
 						 * membershiplist request */
 						repeat = 0;
+						/* CCM_TYPE_REQ_MEMLISTメッセージ送信処理 */
 						while(ccm_send_memlist_request(
 							hb, info)!=HA_OK) {
 							if(repeat < REPEAT_TIMES){
@@ -2858,6 +2884,7 @@ switchstatement:
 						 * then we send it an null
 						 * membership message!
 						 */
+						/* 応答メッセージ(CCM_TYPE_RES_MEMLIST)を送信 */
 						if (ccm_send_cl_reply(hb,info) 
 								== TRUE) {
 							finallist_init();
@@ -2892,6 +2919,7 @@ switchstatement:
 			if (UPDATE_GET_NODECOUNT( CCM_GET_UPDATETABLE(info)) == llm_get_live_nodecount(&info->llm)
 			    && !update_am_i_leader(CCM_GET_UPDATETABLE(info), CCM_GET_LLM(info))) {	
 				
+				/* 応答メッセージ(CCM_TYPE_RES_MEMLIST)を送信 */
 				if (ccm_send_cl_reply(hb,info) == TRUE) {
 					finallist_init();
 					/* infoのstateをCCM_STATE_MEMLIST_RESにセット */
@@ -2936,6 +2964,7 @@ switchstatement:
 
 				/* send out the membershiplist request */
 				repeat = 0;
+				/* CCM_TYPE_REQ_MEMLISTメッセージ送信処理 */
 				while (ccm_send_memlist_request(hb, info) 
 							!= HA_OK) {
 					if(repeat < REPEAT_TIMES){
@@ -2962,6 +2991,7 @@ switchstatement:
 				 * requestor to be the leader, then we send 
 				 * it an abort message!
 				 */
+				/* 応答メッセージ(CCM_TYPE_RES_MEMLIST)を送信 */
 				if (ccm_send_cl_reply(hb, info) == TRUE) {
 					/* free the update data*/
 					finallist_init();
@@ -3063,7 +3093,8 @@ ccm_control_init(ccm_info_t *info)
 	/* if this is the only active node in the cluster, go to the 
 	   JOINED state */
 	if (llm_get_live_nodecount(CCM_GET_LLM(info)) == 1) {
-		/* ノード数が１つだけの場合 */
+		/* ノード数が１つだけ(ha.cfも単一ノードのみ記載)の場合 */
+		/* CCM_STATE_JOINED状態へ遷移する */
 		ccm_init_to_joined(info);
 	} else {
 		/* １つでない場合は、NONE状態へセットする */
@@ -3512,6 +3543,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 			CCM_SET_CL(info, llm_get_index(&info->llm,orig));
 			ccm_fill_update_table(info, CCM_GET_UPDATETABLE(info),
 						uptime_list);
+			/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 			report_mbrs(info);
 			/* infoのstateをCCM_STATE_JOINEDにセット */
 			ccm_set_state(info, CCM_STATE_JOINED, reply);
@@ -3818,6 +3850,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 				CCM_GET_UPDATETABLE(info), uptime_list);
 			/* infoのstateをCCM_STATE_JOINEDにセット */
 			ccm_set_state(info, CCM_STATE_JOINED, reply);	        
+			/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 			report_mbrs(info);
 			break;
 
@@ -4037,5 +4070,6 @@ ccm_on_quorum_changed(void)
 		return;
 	}
 	send_mem_list_to_all(hb_fd_saved, ccm_info_saved, ccm_info_saved->ccm_cookie);
+	/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 	report_mbrs(ccm_info_saved);
 }

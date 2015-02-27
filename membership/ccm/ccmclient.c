@@ -322,7 +322,7 @@ display_func(gpointer key, gpointer value, gpointer user_data)
 	
 	return;
 }
-
+/* 接続している全てのクライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 void
 client_new_mbrship(ccm_info_t* info, void* borndata)
 {
@@ -343,6 +343,7 @@ client_new_mbrship(ccm_info_t* info, void* borndata)
 	ccm->ev = CCM_NEW_MEMBERSHIP;
 	ccm->n = n;
 	ccm->trans = trans;
+	/* QUORUMを判定してセットする */
 	ccm->quorum = get_quorum(info);
 	(void)get_quorum;
 	ccm_debug(LOG_DEBUG, "quorum is %d", ccm->quorum);
@@ -375,7 +376,7 @@ client_new_mbrship(ccm_info_t* info, void* borndata)
 #else
 	(void)display_func;
 #endif 
-	
+	/* 全クライアントにメッセージを送信する */
 	send_all(CCM_NEW_MEMBERSHIP);
 	ccm_debug2(LOG_DEBUG, "membership state: new membership");
 }

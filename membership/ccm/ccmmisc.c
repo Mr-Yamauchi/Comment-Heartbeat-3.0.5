@@ -193,13 +193,14 @@ ccm_check_memoryleak(void)
  */
 
 static  char *leave_bitmap=NULL;
-
+/* leaveî•ñ‚Ì‰Šú‰» */
 void
 leave_init(void)
 {
 	int numBytes;
 	
 	assert(!leave_bitmap);
+	/* leaveî•ñ‚ğ¶¬‚·‚é */
 	numBytes = bitmap_create(&leave_bitmap, MAXNODE);
 	memset(leave_bitmap, 0, numBytes);
 }
