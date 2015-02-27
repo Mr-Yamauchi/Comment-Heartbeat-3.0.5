@@ -116,7 +116,7 @@ void cookie_unref(void *ck);
 static const char *llm_get_Id_from_Uuid(ccm_llm_t *stuff, uint uuid);
 
 
-
+/* CCMのメッセージから、クライアントへ通知するllm情報をセットする */
 static void
 on_llm_msg(mbr_private_t *mem, struct IPC_MESSAGE *msg)
 {
@@ -176,6 +176,7 @@ init_llm(mbr_private_t *private)
 		}
 		break;
 	}
+	/* CCMのメッセージから、クライアントへ通知するllm情報をセットする */
 	on_llm_msg(private, msg);
 	
 	private->bornon = g_hash_table_new(g_direct_hash, 
@@ -276,7 +277,8 @@ get_new_membership(mbr_private_t *private,
 
  	newmbr = *mbr = (mbr_track_t *)g_malloc(size +
 						sizeof(mbr_track_t)-sizeof(newmbr->m_mem));
-	
+	/* m_instanceにmbrinfo->transをセットする */
+	/* #define OC_EV_SET_INSTANCE(m,trans)  m->m_mem.m_instance=trans */
 	trans = OC_EV_SET_INSTANCE(newmbr,mbrinfo->trans);
 	n_members = OC_EV_SET_N_MEMBER(newmbr,mbrinfo->n);
 	OC_EV_SET_SIZE(newmbr, size);
@@ -482,7 +484,7 @@ mem_handle_event(class_t *class)
 		oc_type = OC_EV_MS_INVALID;
 
 		switch(type) {
-		case CCM_NEW_MEMBERSHIP :{
+		case CCM_NEW_MEMBERSHIP :{	/* CCM_NEW_MEMBERSHIPメッセージの場合 */
 			
 			ccm_meminfo_t* cmi = (ccm_meminfo_t*)msg->msg_body;
 			
@@ -597,7 +599,8 @@ mem_handle_event(class_t *class)
 						NULL,NULL);
 			}
 			break;
-		case CCM_LLM:
+		case CCM_LLM: /* CCMからのllm情報の場合 */
+			/* CCMのメッセージから、クライアントへ通知するllm情報をセットする */
 			on_llm_msg(private, msg);
 		}
 
@@ -627,6 +630,7 @@ mem_handle_event(class_t *class)
 
 		if(private->callback && private->client_report && cookie){
 			cookie_ref(cookie);
+			/* クライアントのコールバックを実行する */
 			private->callback(oc_type,
 				(uint *)cookie,
 				size,
