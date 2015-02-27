@@ -100,7 +100,7 @@ string2state(const char* state_str)
 	return -1;
 	
 }
-
+/* infoのstateをセット */
 static void
 ccm_set_state(ccm_info_t* info, int istate,const struct ha_msg*  msg)	
 {	
@@ -314,6 +314,7 @@ finallist_timeout(unsigned long timeout)
 
 /* Reset all the datastructures. Go to a state which is equivalent */
 /* to a state when the node is just about to join a cluster. */
+/* CCM情報(global_info)のリセット */
 void 
 ccm_reset(ccm_info_t *info)
 {
@@ -321,7 +322,7 @@ ccm_reset(ccm_info_t *info)
 	if(ccm_already_joined(info)){
 		client_evicted();
 	}
-
+	/* info->memcountの0リセット */
 	ccm_mem_reset(info);
 	ccm_memcomp_reset(info);
 	CCM_SET_ACTIVEPROTO(info, CCM_VER_NONE);
@@ -330,6 +331,7 @@ ccm_reset(ccm_info_t *info)
 	CCM_SET_MINORTRANS(info,0);
 	CCM_SET_CL(info,-1);
 	CCM_SET_JOINED_TRANSITION(info, 0);
+	/* infoのstateをCCM_STATE_NONEにセット */
 	ccm_set_state(info, CCM_STATE_NONE, NULL);
 	info->has_quorum = -1;
 	update_reset(CCM_GET_UPDATETABLE(info));
@@ -339,15 +341,17 @@ ccm_reset(ccm_info_t *info)
 	leave_reset();
 	report_reset();
 }
-
+/* CCM情報(global_info)の初期化 */
 static void 
 ccm_init(ccm_info_t *info)
 {
 	update_init(CCM_GET_UPDATETABLE(info));
+	/* JOINREQUEST情報のリセット(ノードステータス情報のJOINREQUESTフラグをFALSE,MARJOR_TRANSを０クリアする) */
 	ccm_reset_all_join_request(info);
 	CCM_INIT_MAXTRANS(info);
         leave_init();
         (void)timeout_msg_init(info);
+	/* CCM情報(global_info)のリセット */
 	ccm_reset(info);
 }
 
@@ -717,7 +721,7 @@ ccm_get_all_active_join_request(ccm_info_t* info)
 	
 }
 
-
+/* JOINREQUEST情報のリセット(ノードステータス情報のJOINREQUESTフラグをFALSE,MARJOR_TRANSを０クリアする) */
 static void
 ccm_reset_all_join_request(ccm_info_t* info)
 {
@@ -725,6 +729,7 @@ ccm_reset_all_join_request(ccm_info_t* info)
 	size_t i;
 	
 	for (i = 0 ; i < llm->nodecount; i++){
+		/* JOINREQUESTフラグ=FALSE, MAJOR_TRANS=0で初期化 */
 	  llm_set_joinrequest(llm, i, FALSE, 0);
 	}	
 }
@@ -773,7 +778,6 @@ ccm_remove_new_joiner(ccm_info_t *info, const char *orig)
 
 
 /* send reply to a join quest and clear the request*/
-
 static void 
 ccm_send_join_reply(ll_cluster_t *hb, ccm_info_t *info)
 {
@@ -875,6 +879,7 @@ ccm_compute_and_send_final_memlist(ll_cluster_t *hb, ccm_info_t *info)
 	report_mbrs(info);/* call this before update_reset() */
 /*	update_reset(CCM_GET_UPDATETABLE(info));*/
 	ccm_memcomp_reset(info);
+	/* infoのstateをCCM_STATE_JOINEDにセット */
 	ccm_set_state(info, CCM_STATE_JOINED, NULL);
 	if(!ccm_already_joined(info)) {
 		CCM_SET_JOINED_TRANSITION(info, CCM_GET_MAJORTRANS(info));
@@ -1052,6 +1057,7 @@ ccm_joining_to_joined(ll_cluster_t *hb, ccm_info_t *info)
 	
 	CCM_SET_CL(info, llm_get_myindex(CCM_GET_LLM(info)));
 	update_reset(CCM_GET_UPDATETABLE(info));
+	/* infoのstateをCCM_STATE_JOINEDにセット */
 	ccm_set_state(info, CCM_STATE_JOINED, NULL);
 	report_mbrs(info);
 	if(!ccm_already_joined(info)) {
@@ -1074,15 +1080,16 @@ ccm_init_to_joined(ccm_info_t *info)
 	char*		cookie;
 	int		ret;
 	llm_info_t*	llm = &info->llm;
-	
+	/* info->memcountの0リセット */
 	ccm_mem_reset(info);
+	/* 自ノードのindex情報を取得して、自ノードメンバー情報の追加と、memcountのインクリメント */
 	ret = ccm_mem_add(info, llm_get_myindex(llm));
 	if (ret != HA_OK){
 		ccm_log(LOG_ERR, "%s: adding myself to membership failed",
 		       __FUNCTION__);
 		return HA_FAIL;
 	}
-	
+	/* 自ノードのuptime情報を１でセット */
 	llm_set_uptime(llm, llm_get_myindex(llm), 1);
 
 	CCM_SET_MAJORTRANS(info, CCM_GET_MAJORTRANS(info)+1);
@@ -1091,6 +1098,7 @@ ccm_init_to_joined(ccm_info_t *info)
 	CCM_SET_COOKIE(info, cookie);
 	ccm_free_random_cookie(cookie);
 	CCM_SET_CL(info, llm_get_myindex(CCM_GET_LLM(info)));
+	/* infoのstateをCCM_STATE_JOINEDにセット */
 	ccm_set_state(info, CCM_STATE_JOINED, NULL);
 	CCM_SET_JOINED_TRANSITION(info, 1);
 	report_mbrs(info);
@@ -1120,6 +1128,7 @@ ccm_all_restart(ll_cluster_t* hb, ccm_info_t* info, struct ha_msg* msg)
 	if (info->state != CCM_STATE_VERSION_REQUEST
 	    && gl_membership_converged ){
 		gl_membership_converged = FALSE;
+		/* infoのstateをCCM_STATE_NONEにセット */
 		ccm_set_state(info, CCM_STATE_NONE, msg);
 		CCM_SET_CL(info,-1);
 		if (ccm_send_restart_msg(hb, info) != HA_OK){
@@ -1131,6 +1140,7 @@ ccm_all_restart(ll_cluster_t* hb, ccm_info_t* info, struct ha_msg* msg)
 			ccm_log(LOG_ERR, "sending protoversion failed");
 			return;
 		}
+		/* infoのstateをCCM_STATE_VERSION_REQUESTにセット */
 		ccm_set_state(info, CCM_STATE_VERSION_REQUEST, NULL);
 	}
 	
@@ -1234,6 +1244,7 @@ ccm_state_version_request(enum ccm_type ccm_msg_type,
 				cl_shortsleep(); /* sleep for a while */
 				/* send a fresh version request message */
 				version_reset(CCM_GET_VERSION(info));
+				/* infoのstateをCCM_STATE_NONEにセット */
 				ccm_set_state(info, CCM_STATE_NONE, reply);
 				/* free all the joiners that we accumulated */
 				ccm_reset_all_join_request(info);
@@ -1279,6 +1290,7 @@ ccm_state_version_request(enum ccm_type ccm_msg_type,
 			and set our state to NEW_NODE_WAIT_FOR_MEM_LIST */
 		update_reset(CCM_GET_UPDATETABLE(info));
 		new_node_mem_list_time_init();
+		/* infoのstateをCCM_STATE_NEW_NODE_WAIT_FOR_MEM_LISTにセット */
 		ccm_set_state(info, CCM_STATE_NEW_NODE_WAIT_FOR_MEM_LIST, reply);
 
 		/* free all the joiners that we accumulated */
@@ -1293,6 +1305,7 @@ ccm_state_version_request(enum ccm_type ccm_msg_type,
 		case VER_NO_CHANGE: 
 			break;
 		case VER_TRY_AGAIN:
+			/* infoのstateをCCM_STATE_NONEにセット */
 			ccm_set_state(info, CCM_STATE_NONE, reply);
 			break;
 		case VER_TRY_END:
@@ -1303,6 +1316,7 @@ ccm_state_version_request(enum ccm_type ccm_msg_type,
 			} else {
 				ccm_debug2(LOG_DEBUG,"joined but not really");
 				version_reset(CCM_GET_VERSION(info));
+				/* infoのstateをCCM_STATE_NONEにセット */
 				ccm_set_state(info, CCM_STATE_NONE, reply);
 				ccm_reset_all_join_request(info);
 			}
@@ -1354,6 +1368,7 @@ ccm_state_none(enum ccm_type msgtype,
 		return;
 	}
 	
+	/* infoのstateをCCM_STATE_VERSION_REQUESTにセット */
 	ccm_set_state(info, CCM_STATE_VERSION_REQUEST, NULL);	
 	
 	ccm_state_version_request(msgtype, msg, hb, info);
@@ -1487,6 +1502,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 
 			CCM_SET_MINORTRANS(info, trans_minorval);
 			repeat = 0;
+			/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 			while (ccm_send_join(hb, info) != HA_OK) {
 				if(repeat < REPEAT_TIMES){
 					ccm_debug(LOG_WARNING,
@@ -1497,7 +1513,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 					break;
 				}
 			}
-
+			/* infoのstateをCCM_STATE_JOININGにセット */
 			ccm_set_state(info, CCM_STATE_JOINING, reply);
 			break;	
 
@@ -1513,6 +1529,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			if (node_is_leader(info, orig)){
 				update_reset(CCM_GET_UPDATETABLE(info));
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_debug(LOG_WARNING,
@@ -1523,6 +1540,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING,reply);
 				return;
 			}
@@ -1531,6 +1549,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			 * LEAVE message" and transit to WAIT_FOR_CHANGE
 			 */
 			if(ccm_am_i_leader(info)){
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				add_change_msg(info, orig, CCM_GET_MYNODE_ID(info), 
@@ -1552,6 +1571,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 				}
 				change_time_init();
 				ccm_bcast_node_leave_notice(hb,info, orig);
+				/* infoのstateをCCM_STATE_WAIT_FOR_CHANGEにセット */
 				ccm_set_state(info, CCM_STATE_WAIT_FOR_CHANGE, reply);	
 				
 				
@@ -1578,6 +1598,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			if( !ccm_am_i_leader(info)){				
 				send_node_leave_to_leader(hb, info, leader);
 				mem_list_time_init();
+				/* infoのstateをCCM_STATE_WAIT_FOR_MEM_LISTにセット */
 				ccm_set_state(info,CCM_STATE_WAIT_FOR_MEM_LIST, reply);
 			}
 			break;
@@ -1595,13 +1616,14 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			 */
 			if(ccm_am_i_leader(info)){           
 				const char *node = ha_msg_value(reply, F_NODE);
-
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				add_change_msg(info,node,orig,NODE_LEAVE);
 				update_add(CCM_GET_UPDATETABLE(info), 
 						CCM_GET_LLM(info), orig, uptime_val, FALSE);
 				change_time_init();
+				/* infoのstateをCCM_STATE_WAIT_FOR_CHANGEにセット */
 				ccm_set_state(info, CCM_STATE_WAIT_FOR_CHANGE, reply);
 			}
 			break;
@@ -1611,6 +1633,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			 * transit to WAIT_FOR_CHANGE
 			 */
 			if (ccm_am_i_leader(info)){
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				add_change_msg(info,orig, CCM_GET_MYNODE_ID(info), 
@@ -1635,6 +1658,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 					return;
 				}
 				change_time_init();
+				/* infoのstateをCCM_STATE_WAIT_FOR_CHANGEにセット */
 				ccm_set_state(info, CCM_STATE_WAIT_FOR_CHANGE, reply);
 			}else{
 				/* I'm not leader, send CCM_TYPE_NEW_NODE
@@ -1642,6 +1666,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 				 */
 				ccm_send_newnode_to_leader(hb, info, orig);
 				mem_list_time_init();
+				/* infoのstateをCCM_STATE_WAIT_FOR_MEM_LISTにセット */
 				ccm_set_state(info,CCM_STATE_WAIT_FOR_MEM_LIST, reply);
 			}
 			break;
@@ -1659,7 +1684,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			 */
 			if(ccm_am_i_leader(info)){
 				const char *node = ha_msg_value(reply, F_NODE);
-
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);	
 				update_reset(CCM_GET_UPDATETABLE(info));
 				add_change_msg(info,node, orig, NEW_NODE);
@@ -1667,6 +1692,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 						CCM_GET_LLM(info),
 						orig, uptime_val, FALSE);
 				change_time_init();
+				/* infoのstateをCCM_STATE_WAIT_FOR_CHANGEにセット */
 				ccm_set_state(info, CCM_STATE_WAIT_FOR_CHANGE, reply);
 			}
 			break;
@@ -1699,6 +1725,7 @@ ccm_state_joined(enum ccm_type ccm_msg_type,
 			
 			if (node_is_leader(info, orig)
 			    && !am_i_member_in_memlist(info, memlist)){
+				/* infoのstateをCCM_STATE_NONEにセット */
 				ccm_set_state(info, CCM_STATE_NONE, reply);
 				break;
 			}
@@ -1852,15 +1879,18 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 					CCM_RESET_MINORTRANS(info);
 					CCM_SET_COOKIE(info, newcookie); 
 					report_mbrs(info);
+					/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 					reset_change_info(info); 
 /*					update_reset(CCM_GET_UPDATETABLE(info));*/
 					ccm_free_random_cookie(newcookie);
 					ccm_send_join_reply(hb, info);
 					CCM_SET_CL(info, llm_get_myindex(CCM_GET_LLM(info)));
+					/* infoのstateをCCM_STATE_JOINEDにセット */
 					ccm_set_state(info, CCM_STATE_JOINED,reply);
 					return;
 				}
 			}else{
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
@@ -1875,6 +1905,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 				return;
 			}                  
@@ -1919,22 +1950,27 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 					CCM_RESET_MINORTRANS(info);
 					CCM_SET_COOKIE(info, newcookie); 
 					report_mbrs(info);
+					/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 					reset_change_info(info); 
 /*					update_reset(CCM_GET_UPDATETABLE(info));*/
 					ccm_free_random_cookie(newcookie);
 					ccm_send_join_reply(hb, info);
+					/* infoのstateをCCM_STATE_JOINEDにセット */
 					ccm_set_state(info, CCM_STATE_JOINED, reply);
 					return;
 				}                       
 			}else{
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					ccm_debug(LOG_WARNING, "%s: failure to send join",
 					__FUNCTION__);
 					cl_shortsleep();
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 				return;
 			}
@@ -1942,10 +1978,12 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 	    	
 		case CCM_TYPE_TIMEOUT:
 			if(change_timeout(CCM_TMOUT_GET_U(info))){
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_debug(LOG_WARNING,
@@ -1956,6 +1994,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 			}
 			break;
@@ -1985,6 +2024,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 
 			CCM_SET_MINORTRANS(info, trans_minorval);
 			repeat = 0;
+			/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 			while (ccm_send_join(hb, info) != HA_OK) {
 				if(repeat < REPEAT_TIMES){
 					ccm_debug(LOG_WARNING,
@@ -1995,7 +2035,7 @@ static void ccm_state_wait_for_change(enum ccm_type ccm_msg_type,
 					break;
 				}
 			}
-
+			/* infoのstateをCCM_STATE_JOININGにセット */
 			ccm_set_state(info, CCM_STATE_JOINING, reply);
 			break;		
 
@@ -2395,6 +2435,7 @@ switchstatement:
 
 				CCM_SET_MINORTRANS(info, trans_minorval);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_log(LOG_ERR,
@@ -2405,6 +2446,7 @@ switchstatement:
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 			}
 
@@ -2454,6 +2496,7 @@ switchstatement:
 			update_reset(CCM_GET_UPDATETABLE(info));
 			CCM_INCREMENT_MINORTRANS(info);
 			repeat = 0;
+			/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 			while (ccm_send_join(hb, info) != HA_OK) {
 				if(repeat < REPEAT_TIMES){
 					ccm_log(LOG_ERR,
@@ -2465,6 +2508,7 @@ switchstatement:
 				}
 			}
 			finallist_reset();
+			/* infoのstateをCCM_STATE_JOININGにセット */
 			ccm_set_state(info, CCM_STATE_JOINING, reply);
 			break;
 
@@ -2484,6 +2528,7 @@ switchstatement:
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_log(LOG_ERR,
@@ -2495,6 +2540,7 @@ switchstatement:
 					}
 				}
 				finallist_reset();
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 			}
 
@@ -2583,6 +2629,7 @@ switchstatement:
 			report_mbrs(info); /* call before update_reset */
 /*			update_reset(CCM_GET_UPDATETABLE(info));*/
 			finallist_reset();
+			/* infoのstateをCCM_STATE_JOINEDにセット */
 			ccm_set_state(info, CCM_STATE_JOINED, reply);
 			ccm_reset_all_join_request(info);
 			if(!ccm_already_joined(info)) 
@@ -2615,6 +2662,7 @@ switchstatement:
 /* the state machine that processes messages when it is in the */
 /* CCM_STATE_JOINING state. */
 /* */
+/* CCM_STATE_JOINING状態でのメッセージ受信処理 */
 static void
 ccm_state_joining(enum ccm_type ccm_msg_type, 
 		struct ha_msg *reply, 
@@ -2719,7 +2767,7 @@ switchstatement:
 			
 			break;
 
-        	case CCM_TYPE_JOIN:
+       	case CCM_TYPE_JOIN: /* JOINメッセージを受信した場合(単ノード起動、クラスタ構成中に他ノードが起動) *
 			/* get the update value */
 			if((uptime = ha_msg_value(reply, CCM_UPTIME)) == NULL){ 
 				ccm_debug(LOG_WARNING, "%s: no update information", __FUNCTION__);
@@ -2747,6 +2795,7 @@ switchstatement:
 
 				CCM_SET_MINORTRANS(info, trans_minorval);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_log(LOG_ERR, 
@@ -2792,6 +2841,7 @@ switchstatement:
 						ccm_memcomp_init(info);
 						ccm_memcomp_note_my_membership(
 								info);
+						/* infoのstateをCCM_STATE_SENT_MEMLISTREQにセット */
 						ccm_set_state(info, 
 							      CCM_STATE_SENT_MEMLISTREQ, reply);
 					} else {
@@ -2811,6 +2861,7 @@ switchstatement:
 						if (ccm_send_cl_reply(hb,info) 
 								== TRUE) {
 							finallist_init();
+							/* infoのstateをCCM_STATE_MEMLIST_RESにセット */
 							ccm_set_state(info, 
 								      CCM_STATE_MEMLIST_RES, reply);
 						}
@@ -2843,6 +2894,7 @@ switchstatement:
 				
 				if (ccm_send_cl_reply(hb,info) == TRUE) {
 					finallist_init();
+					/* infoのstateをCCM_STATE_MEMLIST_RESにセット */
 					ccm_set_state(info, CCM_STATE_MEMLIST_RES, reply);
 					break;
 				}					
@@ -2898,6 +2950,7 @@ switchstatement:
 				}
 				ccm_memcomp_init(info);
 				ccm_memcomp_note_my_membership(info);
+				/* infoのstateをCCM_STATE_SENT_MEMLISTREQにセット */
 				ccm_set_state(info, CCM_STATE_SENT_MEMLISTREQ, reply);
 			} else {
 				/* check if we have already received memlist 
@@ -2912,6 +2965,7 @@ switchstatement:
 				if (ccm_send_cl_reply(hb, info) == TRUE) {
 					/* free the update data*/
 					finallist_init();
+				/* infoのstateをCCM_STATE_MEMLIST_RESにセット */
 					ccm_set_state(info, 
 						      CCM_STATE_MEMLIST_RES, reply);
 				}
@@ -2943,6 +2997,7 @@ switchstatement:
 			CCM_INCREMENT_MINORTRANS(info);
 			update_reset(CCM_GET_UPDATETABLE(info));
 			repeat = 0;
+			/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 			while (ccm_send_join(hb, info) != HA_OK) {
 				if(repeat < REPEAT_TIMES){
 					ccm_log(LOG_ERR,
@@ -2957,7 +3012,7 @@ switchstatement:
 			break;
 
 		case CCM_TYPE_LEAVE: 
-
+			/* 他ノードのHeartbeat上のccmが切断した時に生成したCCM_TYPE_LEAVEメッセージの場合 */
 			/* 
 			 * Has that node already sent a valid update message 
 			 * before death. If so, remove him from the update 
@@ -3002,6 +3057,7 @@ switchstatement:
 static void
 ccm_control_init(ccm_info_t *info)
 {
+	/* CCM情報(global_info)の初期化 */
 	ccm_init(info);
 	
 	/* if this is the only active node in the cluster, go to the 
@@ -3011,6 +3067,7 @@ ccm_control_init(ccm_info_t *info)
 		ccm_init_to_joined(info);
 	} else {
 		/* １つでない場合は、NONE状態へセットする */
+		/* infoのstateをCCM_STATE_NONEにセット */
 		ccm_set_state(info, CCM_STATE_NONE, NULL);
 	}
 	
@@ -3023,6 +3080,7 @@ ccm_control_init(ccm_info_t *info)
 /* The callback function which is called when the status of a link */
 /* changes. */
 /* */
+/* Heartbeatからのinterface STATUSメッセージコールバック(処理はしていない) */
 static void
 LinkStatus(const char * node, const char * lnk, const char * status ,
 		void * private)
@@ -3241,6 +3299,7 @@ ccm_initialize()
 	ccm_log(LOG_INFO, "Hostname: %s", hname);
 
 	/* Heartbeatからのinterface STATUSメッセージコールバックをLinkStatus()にセット */
+	/* だだし、処理はしていない */
 	if (hb_fd->llc_ops->set_ifstatus_callback(hb_fd, LinkStatus, NULL)
 	    !=HA_OK){
 		ccm_log(LOG_ERR, "Cannot set if status callback");
@@ -3271,7 +3330,7 @@ ccm_initialize()
 	if (set_llm_from_heartbeat(hb_fd, global_info) != HA_OK){
 		goto errout;
 	}
-	/* 制御情報を初期化 */
+	/* 制御情報(global_info)を初期化 */
 	ccm_control_init(global_info);
 	
 	/* keepalive値からのタイムアウト設定処理 */
@@ -3281,7 +3340,7 @@ ccm_initialize()
 	ccmret->info = global_info;
 	ccmret->hbfd = hb_fd;
 	
-	
+	/* クライアントメッセージ初期化処理(ipc_llm_messageにメンバー情報をセットする) */
 	client_llm_init(&global_info->llm);
 	ccm_info_saved = global_info;
 	hb_fd_saved = hb_fd;
@@ -3454,15 +3513,18 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 			ccm_fill_update_table(info, CCM_GET_UPDATETABLE(info),
 						uptime_list);
 			report_mbrs(info);
+			/* infoのstateをCCM_STATE_JOINEDにセット */
 			ccm_set_state(info, CCM_STATE_JOINED, reply);
 			break;
         	
 		case CCM_TYPE_TIMEOUT:
         		if (mem_list_timeout(CCM_TMOUT_GET_U(info))){
+				/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 				reset_change_info(info);
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_debug(LOG_WARNING,
@@ -3473,6 +3535,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 			}
 			break;
@@ -3501,6 +3564,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 
 			CCM_SET_MINORTRANS(info, trans_minorval);
 			repeat = 0;
+			/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 			while (ccm_send_join(hb, info) != HA_OK) {
 				if(repeat < REPEAT_TIMES){
 					ccm_debug(LOG_WARNING,
@@ -3511,7 +3575,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 					break;
 				}
 			}
-
+			/* infoのstateをCCM_STATE_JOININGにセット */
 			ccm_set_state(info, CCM_STATE_JOINING, reply);
 			break;
 
@@ -3522,6 +3586,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_debug(LOG_WARNING,
@@ -3532,6 +3597,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 				return;
 			}
@@ -3567,7 +3633,7 @@ static void ccm_state_wait_for_mem_list(enum ccm_type ccm_msg_type,
 	}
 }
 
-
+/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 static void
 reset_change_info(ccm_info_t *info)
 {
@@ -3731,6 +3797,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 			
 			if (i_am_member(info) == FALSE){
 				version_reset(CCM_GET_VERSION(info));
+				/* infoのstateをCCM_STATE_NONEにセット */
 				ccm_set_state(info, CCM_STATE_NONE, reply);
 				ccm_reset_all_join_request(info);
 				break;
@@ -3749,6 +3816,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 			CCM_SET_JOINED_TRANSITION(info, CCM_GET_MAJORTRANS(info));
 			ccm_fill_update_table(info, 
 				CCM_GET_UPDATETABLE(info), uptime_list);
+			/* infoのstateをCCM_STATE_JOINEDにセット */
 			ccm_set_state(info, CCM_STATE_JOINED, reply);	        
 			report_mbrs(info);
 			break;
@@ -3758,6 +3826,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_debug(LOG_WARNING,
@@ -3768,6 +3837,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 			}	
 			break;
@@ -3796,6 +3866,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 
 			CCM_SET_MINORTRANS(info, trans_minorval);
 			repeat = 0;
+			/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 			while (ccm_send_join(hb, info) != HA_OK) {
 				if(repeat < REPEAT_TIMES){
 					ccm_debug(LOG_WARNING,
@@ -3806,6 +3877,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 					break;
 				}
 			}
+			/* infoのstateをCCM_STATE_JOININGにセット */
 			ccm_set_state(info, CCM_STATE_JOINING, reply);
 			break;		
 
@@ -3816,6 +3888,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 				update_reset(CCM_GET_UPDATETABLE(info));
 				CCM_INCREMENT_MINORTRANS(info);
 				repeat = 0;
+				/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 				while (ccm_send_join(hb, info) != HA_OK) {
 					if(repeat < REPEAT_TIMES){
 						ccm_debug(LOG_WARNING,
@@ -3826,6 +3899,7 @@ static void ccm_state_new_node_wait_for_mem_list(enum ccm_type ccm_msg_type,
 						break;
 					}
 				}
+				/* infoのstateをCCM_STATE_JOININGにセット */
 				ccm_set_state(info, CCM_STATE_JOINING, reply);
 			}
 
@@ -3882,15 +3956,18 @@ int
 jump_to_joining_state(ll_cluster_t *hb, 
 		      ccm_info_t *info,
 		      struct ha_msg* msg){
-	
+	/* global_infoのllm情報のreceive_change_msgをFALSEにセットする */
 	reset_change_info(info);
 	update_reset(CCM_GET_UPDATETABLE(info));
+	/* global_infoのccm_transition_minorをインクリメント */
 	CCM_INCREMENT_MINORTRANS(info);
+	/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */*/
 	if (ccm_send_join(hb, info) != HA_OK){
 		ccm_log(LOG_ERR, "sending joining message failed");
 		return HA_FAIL;
 		
 	}
+	/* infoのstateをCCM_STATE_JOININGにセット */
 	ccm_set_state(info, CCM_STATE_JOINING, msg);
 	return HA_OK;
 }

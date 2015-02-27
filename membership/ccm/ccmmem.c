@@ -24,14 +24,14 @@
 #include <lha_internal.h>
 #include "ccm.h"
 #include "ccmmisc.h"
-
+/* info->memcountの0リセット */
 void
 ccm_mem_reset(ccm_info_t* info)
 {
 	info->memcount = 0;	
 	return;
 }
-
+/* メンバー情報の追加と、memcountのインクリメント */
 int
 ccm_mem_add(ccm_info_t* info, int index)
 {

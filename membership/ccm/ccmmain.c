@@ -110,6 +110,7 @@ static void waitCh_input_destroy(gpointer);
 static gboolean
 waitCh_input_dispatch(IPC_Channel *newclient, gpointer user_data)
 {
+	/* 接続クライアント情報の追加と、ccm情報の接続クライアントへの送信 */
 	client_add(newclient);
 
 	/* Some ccm clients may not consume our messages fast enough,
@@ -261,6 +262,7 @@ main(int argc, char **argv)
 	cl_inherit_logging_environment(0);
 
 	/* initialize the client tracking system */
+	/* 接続クライアント情報(ccm_hashclient)の生成 */
 	client_init();
 
 	/* 

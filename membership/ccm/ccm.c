@@ -31,7 +31,7 @@ extern state_msg_handler_t	state_msg_handler[];
 
 struct ha_msg * ccm_readmsg(ccm_info_t *info, ll_cluster_t *hb);
 static GList* quorum_list = NULL;
-
+/* 他ノードのHeartbeat上でCCMプロセスがHeartbeatのクライアントとして、接続・切断した時に通知処理 */
 static struct ha_msg*
 ccm_handle_hbapiclstat(ccm_info_t *info,  
 		       const char *orig, 
@@ -42,11 +42,13 @@ ccm_handle_hbapiclstat(ccm_info_t *info,
 	
 	if(state == CCM_STATE_NONE ||
 		state == CCM_STATE_VERSION_REQUEST) {
+		//CCM_STATE_NONE,CCM_STATE_VERSION_REQUEST中は処理しない
 		return NULL;
 	}
 
 	assert(status);
 	if(strncmp(status, JOINSTATUS, 5) == 0) {
+		//他ノードのHeartbeat上でCCMプロセスがHeartbeatのクライアントとして、接続した時は、debugメッセージでRETURN
 		ccm_debug2(LOG_DEBUG,
 		       "ccm on %s started", orig);
 		return NULL;
@@ -58,9 +60,11 @@ ccm_handle_hbapiclstat(ccm_info_t *info,
 	
 	index = llm_get_index(&info->llm, orig);
 	if(index == -1) {
+		//認識していない他ノードなら無視する
 		return NULL;
 	}
-	
+	//ここまでくるのは切断メッセージのみで、認識しているノードの場合
+	//切断したノード情報のCCM_TYPE_LEAVEメッセージを生成して返す。
 	return(ccm_create_leave_msg(info, index));
 }
 
@@ -147,12 +151,15 @@ ccm_control_process(ccm_info_t *info, ll_cluster_t * hb)
 		
 		if(strcmp(type, T_APICLISTAT) == 0){
 			/* TYPEがT_APICLISTATの場合 */
+			/* 他ノードのHeartbeat上でCCMプロセスがHeartbeatのクライアントとして、接続・切断した時に通知される */
 			/* handle ccm status of on other nodes of the cluster */
 		       	if((newmsg = ccm_handle_hbapiclstat(info, orig, 
 				status)) == NULL) {
+					/* 他ノードのccm接続メッセージの場合は、RETURN */
 				ha_msg_del(msg);
 				return TRUE;
 			}
+			/* 切断メッセージの場合は続けて、ccm_handle_hbapiclstat()で生成されたCCM_TYPE_LEAVEメッセージを処理 */
 			ha_msg_del(msg);
 			msg = newmsg;
 		} else if(strcasecmp(type, T_STATUS) == 0){
@@ -261,7 +268,7 @@ ccm_control_process(ccm_info_t *info, ll_cluster_t * hb)
 	state_msg_handler_t	state_msg_handler[]={
 	ccm_state_none,
 	ccm_state_version_request,
-	ccm_state_joining,  
+	ccm_state_joining,  						/* CCM_STATE_JOINING状態でのメッセージ受信処理 */
 	ccm_state_sent_memlistreq,
 	ccm_state_memlist_res,
 	ccm_state_joined, 

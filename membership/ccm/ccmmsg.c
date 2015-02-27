@@ -283,7 +283,7 @@ ccm_send_protoversion(ll_cluster_t *hb, ccm_info_t *info)
 	return ccm_send_minimum_clustermsg(hb, info, CCM_TYPE_PROTOVERSION);
 }
 
-/* JOINメッセージ送信処理 */
+/* JOINメッセージ(CCM_TYPE_JOIN)送信処理 */
 int
 ccm_send_join(ll_cluster_t *hb, ccm_info_t *info)
 {

@@ -128,7 +128,7 @@ void
 update_reset(ccm_update_t *tab)
 {
 	int i;
-	
+	/* leader‚É-1‚ðƒZƒbƒg‚·‚é */
 	UPDATE_SET_LEADER(tab, -1);
 	UPDATE_SET_NODECOUNT(tab, 0);
 	for ( i = 0 ; i < MAXNODE; i++ ) {

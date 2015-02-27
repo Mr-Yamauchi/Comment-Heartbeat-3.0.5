@@ -92,7 +92,7 @@ send_message(ccm_client_t *ccm_client, ccm_ipc_t *msg)
 
 	return;
 }
-
+/* クライアントにメッセージを送信する */
 static void 
 send_func(gpointer key, gpointer value, gpointer user_data)
 {
@@ -118,7 +118,9 @@ send_func(gpointer key, gpointer value, gpointer user_data)
 		break;
 	case CCM_NEW_MEMBERSHIP:
 		if(membership_ready) {
+			/* クライアントにipc_llm_messageにセットされているメンバー情報を送信する */
 			send_message(ccm_client, ipc_llm_message);
+			/* クライアントにipc_mem_messageにセットされている情報を送信する */
 			send_message(ccm_client, ipc_mem_message);
 		}
 		break;
@@ -169,7 +171,7 @@ create_message(void *data, int size)
 	return ipcmsg;
 }
 
-
+/* 全クライアントにメッセージを送信する */
 static void 
 send_all(int msg_type)
 {
@@ -227,7 +229,7 @@ cleanup(void)
 	return;
 }
 
-
+/* 接続クライアント情報(ccm_hashclient)の生成 */
 void
 client_init(void)
 {
@@ -240,7 +242,7 @@ client_init(void)
 
 	return;
 }
-
+/* 接続クライアント情報の追加と、ccm情報の接続クライアントへの送信 */
 int
 client_add(struct IPC_CHANNEL *ipc_client)
 {
@@ -257,13 +259,13 @@ client_add(struct IPC_CHANNEL *ipc_client)
 	ccm_client->ccm_clid = 0; /* don't care, TOBEDONE */
 	ccm_client->ccm_ipc_client = ipc_client;
 	ccm_client->ccm_flags = CL_INIT;
-
+	/* 接続クライアントにCCM_NEW_MEMBERSHIPメッセージを送信する */
 	send_func(ipc_client, ccm_client, (gpointer)CCM_NEW_MEMBERSHIP);
-
+	/* 接続クライアントをハッシュテーブルに登録 */
 	g_hash_table_insert(ccm_hashclient, ipc_client, ccm_client);
 	return 0;
 }
-
+/* 接続クライアント情報の破棄 */
 static void
 client_destroy(struct IPC_CHANNEL *ipc_client)
 {
@@ -274,7 +276,7 @@ client_destroy(struct IPC_CHANNEL *ipc_client)
 	}
 	/* IPC_Channel is automatically destroyed when channel is disconnected */
 }
-
+/* 接続クライアント情報の削除 */
 void
 client_delete(struct IPC_CHANNEL *ipc_client)
 {
@@ -359,6 +361,7 @@ client_new_mbrship(ccm_info_t* info, void* borndata)
 	if(ipc_mem_message && --(ipc_mem_message->count)==0){
 		delete_message(ipc_mem_message);
 	}
+	/* ipc_mem_messageをセットする */
 	ipc_mem_message = create_message(ccm, 
  			(sizeof(ccm_meminfo_t) + n*sizeof(born_t)));
 	ipc_mem_message->count++;
@@ -412,15 +415,16 @@ client_evicted(void)
 	ccm_debug2(LOG_DEBUG, "membership state: evicted");
 }
 
-/* クライアントメッセージ初期化処理 */
+/* クライアントメッセージ初期化処理(ipc_llm_messageにメンバー情報をセットする) */
 void 
 client_llm_init(llm_info_t *llm)
 {
+	/* メッセージリフレッシュ(ipc_llm_messageにメンバー情報をセットする) */
 	refresh_llm_msg(llm);
 	return;
 }
 
-/* メッセージリフレッシュ */
+/* メッセージリフレッシュ(ipc_llm_messageにメンバー情報をセットする) */
 void 
 refresh_llm_msg(llm_info_t *llm)
 {

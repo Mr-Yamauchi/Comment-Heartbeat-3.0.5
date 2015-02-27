@@ -121,7 +121,7 @@ llm_display(llm_info_t *llm)
 	}
 	
 }
-
+/* 自ノードのindex情報を取得 */
 int 
 llm_get_myindex(llm_info_t* llm)
 {
@@ -346,7 +346,7 @@ llm_add(llm_info_t *llm,
 
 	return HA_OK;
 }
-
+/* JOINREQUESTフラグ, MAJOR_TRANSをセットする */
 int
 llm_set_joinrequest(llm_info_t* llm, int index, gboolean value, int major_trans)
 {
@@ -443,7 +443,7 @@ llm_get_change(llm_info_t* llm, int index)
 	
 	return llm->nodes[index].receive_change_msg;	
 }
-
+/* uptime情報のセット */
 int
 llm_set_uptime(llm_info_t* llm, int index, int uptime)
 {
